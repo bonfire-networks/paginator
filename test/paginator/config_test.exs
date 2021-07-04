@@ -138,7 +138,7 @@ defmodule Paginator.ConfigTest do
         Config.new(
           cursor_fields: [{:person, :first_name}, {{:person, :last_name}, :asc}],
           after:
-            Cursor.encode(%{
+            Cursor.maybe_encode(%{
               {:person, :first_name} => "Test 121",
               {:person, :birth_date} => "1990-10-10"
             })
@@ -154,7 +154,7 @@ defmodule Paginator.ConfigTest do
         Config.new(
           cursor_fields: [{:person, :first_name}, {{:person, :last_name}, :asc}],
           after:
-            Cursor.encode(%{
+            Cursor.maybe_encode(%{
               {:person, :first_name} => "Test 121",
               {:person, :last_name} => "Test"
             })
@@ -172,8 +172,8 @@ defmodule Paginator.ConfigTest do
     end
   end
 
-  def simple_after, do: Cursor.encode(%{id: "pay_123"})
-  def simple_before, do: Cursor.encode(%{id: "pay_789"})
-  def complex_after, do: Cursor.encode(%{date: "2036-02-09T20:00:00.000Z", id: "pay_123"})
-  def complex_before, do: Cursor.encode(%{date: "2036-02-09T20:00:00.000Z", id: "pay_789"})
+  def simple_after, do: Cursor.maybe_encode(%{id: "pay_123"})
+  def simple_before, do: Cursor.maybe_encode(%{id: "pay_789"})
+  def complex_after, do: Cursor.maybe_encode(%{date: "2036-02-09T20:00:00.000Z", id: "pay_123"})
+  def complex_before, do: Cursor.maybe_encode(%{date: "2036-02-09T20:00:00.000Z", id: "pay_789"})
 end

@@ -311,8 +311,7 @@ defmodule Paginator do
       cursor_field when is_atom(cursor_field) ->
         {cursor_field, fetch_cursor_value_fun.(schema, cursor_field)}
     end)
-    |> Map.new()
-    |> Cursor.encode()
+    |> Cursor.maybe_encode()
   end
 
   defp first_page?(sorted_entries, %Config{limit: limit}) do

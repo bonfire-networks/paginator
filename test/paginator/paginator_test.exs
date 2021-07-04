@@ -2,8 +2,6 @@ defmodule PaginatorTest do
   use Paginator.DataCase
   doctest Paginator
 
-  alias Calendar.DateTime, as: DT
-
   alias Paginator.Cursor
 
   setup :create_customers_and_payments
@@ -33,7 +31,7 @@ defmodule PaginatorTest do
 
     page = payments_by_charged_at() |> Repo.paginate(opts)
     assert to_ids(page.entries) == to_ids([p5, p4, p1, p6])
-    assert %{charged_at: charged_at, id: id} = Cursor.decode(page.metadata.after)
+    assert %{charged_at: charged_at, id: id} = Cursor.maybe_decode(page.metadata.after)
     assert charged_at == p6.charged_at
     assert id == p6.id
 
@@ -41,7 +39,7 @@ defmodule PaginatorTest do
 
     page = payments_by_charged_at() |> Repo.paginate(opts ++ [after: legacy_cursor])
     assert to_ids(page.entries) == to_ids([p7, p3, p10, p2])
-    assert %{charged_at: charged_at, id: id} = Cursor.decode(page.metadata.after)
+    assert %{charged_at: charged_at, id: id} = Cursor.maybe_decode(page.metadata.after)
     assert charged_at == p2.charged_at
     assert id == p2.id
 
@@ -1038,7 +1036,7 @@ defmodule PaginatorTest do
   end
 
   defp encode_cursor(value) do
-    Cursor.encode(value)
+    Cursor.maybe_encode(value)
   end
 
   defp encode_legacy_cursor(value) when is_list(value) do
@@ -1048,6 +1046,10 @@ defmodule PaginatorTest do
   end
 
   defp days_ago(days) do
-    DT.add!(DateTime.utc_now(), -(days * 86400))
+    DateTime.add(
+      DateTime.utc_now(),
+      - (days * 86400),
+      :second
+    )
   end
 end

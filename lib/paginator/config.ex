@@ -30,9 +30,9 @@ defmodule Paginator.Config do
   def new(opts \\ []) do
     %__MODULE__{
       after: opts[:after],
-      after_values: Cursor.decode(opts[:after]),
+      after_values: Cursor.maybe_decode(opts[:after]),
       before: opts[:before],
-      before_values: Cursor.decode(opts[:before]),
+      before_values: Cursor.maybe_decode(opts[:before]),
       cursor_fields: opts[:cursor_fields],
       fetch_cursor_value_fun:
         opts[:fetch_cursor_value_fun] || (&Paginator.default_fetch_cursor_value/2),

@@ -11,6 +11,7 @@ defmodule Paginator.Ecto.Query do
     queryable
     |> maybe_where(config)
     |> limit(^query_limit(config))
+    # |> IO.inspect(label: "paginate query")
   end
 
   def paginate(queryable, opts) do
