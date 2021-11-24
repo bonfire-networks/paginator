@@ -55,7 +55,7 @@ defmodule Paginator do
       @defaults unquote(opts)
 
       def paginate(queryable, opts \\ [], repo_opts \\ []) do
-        opts = Keyword.merge(@defaults, opts)
+        opts = Keyword.merge(@defaults, opts || [])
 
         Paginator.paginate(queryable, opts, __MODULE__, repo_opts)
       end
