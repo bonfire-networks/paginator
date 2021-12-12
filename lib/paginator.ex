@@ -48,7 +48,7 @@ defmodule Paginator do
 
   import Ecto.Query
 
-  alias Paginator.{Config, Cursor, Ecto.Query, Page, Page.Metadata}
+  alias Paginator.{Config, Cursor, Ecto.Query, Page, PageInfo}
 
   defmacro __using__(opts) do
     quote do
@@ -176,15 +176,15 @@ defmodule Paginator do
 
     Config.validate!(config)
 
-    sorted_entries = entries(queryable, config, repo, repo_opts)
+    sorted_entries = edges(queryable, config, repo, repo_opts)
     paginated_entries = paginate_entries(sorted_entries, config)
     {total_count, total_count_cap_exceeded} = total_count(queryable, config, repo, repo_opts)
 
     %Page{
-      entries: paginated_entries,
-      metadata: %Metadata{
-        before: before_cursor(paginated_entries, sorted_entries, config),
-        after: after_cursor(paginated_entries, sorted_entries, config),
+      edges: paginated_entries,
+      page_info: %PageInfo{
+        start_cursor: before_cursor(paginated_entries, sorted_entries, config),
+        end_cursor: after_cursor(paginated_entries, sorted_entries, config),
         limit: config.limit,
         total_count: total_count,
         total_count_cap_exceeded: total_count_cap_exceeded
@@ -198,7 +198,7 @@ defmodule Paginator do
     Config.validate!(config)
 
     queryable
-    |> Query.paginate(config)
+    |> paginated_queryable(config)
   end
 
   @doc """
@@ -277,8 +277,8 @@ defmodule Paginator do
     end
   end
 
-  defp first_or_nil(entries, config) do
-    if first = List.first(entries) do
+  defp first_or_nil(edges, config) do
+    if first = List.first(edges) do
       fetch_cursor_value(first, config)
     else
       nil
@@ -300,8 +300,8 @@ defmodule Paginator do
     end
   end
 
-  defp last_or_nil(entries, config) do
-    if last = List.last(entries) do
+  defp last_or_nil(edges, config) do
+    if last = List.last(edges) do
       fetch_cursor_value(last, config)
     else
       nil
@@ -331,7 +331,7 @@ defmodule Paginator do
     Enum.count(sorted_entries) <= limit
   end
 
-  defp entries(queryable, config, repo, repo_opts) do
+  defp edges(queryable, config, repo, repo_opts) do
     queryable
     |> paginated_queryable(config)
     |> repo.all(repo_opts)

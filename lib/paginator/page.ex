@@ -4,14 +4,14 @@ defmodule Paginator.Page do
 
   ## Fields
 
-  * `entries` - a list entries contained in this page.
-  * `metadata` - metadata attached to this page.
+  * `edges` - a list of entries contained in this page.
+  * `page_info` - meta-data attached to this page.
   """
 
   @type t :: %__MODULE__{
-          entries: [any()] | [],
-          metadata: Paginator.Page.Metadata.t()
+          edges: [any()] | [],
+          page_info: Paginator.PageInfo.t()
         }
 
-  defstruct [:metadata, :entries]
+  defstruct [:page_info, :edges]
 end
