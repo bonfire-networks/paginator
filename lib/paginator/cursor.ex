@@ -1,7 +1,7 @@
 defmodule Paginator.Cursor do
   @moduledoc false
   require Logger
-  @log_level :warn
+  @log_level :debug
 
   def maybe_encode([id: id] = attrs) do # workaround to use the ID as the cursor if that's the only cursor_field
     if is_id?(id) do
