@@ -1,5 +1,5 @@
 defmodule PaginatorTest do
-  use Paginator.DataCase
+  use Paginator.DataCase, async: true
   doctest Paginator
 
   alias Paginator.Cursor

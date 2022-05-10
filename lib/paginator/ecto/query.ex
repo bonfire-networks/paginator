@@ -2,16 +2,17 @@ defmodule Paginator.Ecto.Query do
   @moduledoc false
 
   import Ecto.Query
-
+  import Where
   alias Paginator.Config
 
   def paginate(queryable, config \\ [])
 
   def paginate(queryable, %Config{} = config) do
+    # info(config, "config")
+
     queryable
     |> maybe_where(config)
     |> limit(^query_limit(config))
-    # |> IO.inspect(label: "paginate query")
   end
 
   def paginate(queryable, opts) do

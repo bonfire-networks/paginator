@@ -47,7 +47,7 @@ defmodule Paginator do
   """
 
   import Ecto.Query
-
+  import Where
   alias Paginator.{Config, Cursor, Ecto.Query, Page, PageInfo}
 
   defmacro __using__(opts) do
@@ -340,6 +340,7 @@ defmodule Paginator do
   defp paginated_queryable(queryable, config) do
     queryable
     |> Query.paginate(config)
+    # |> info()
   end
 
   defp total_count(_queryable, %Config{include_total_count: false}, _repo, _repo_opts),
