@@ -1,11 +1,10 @@
 defmodule Paginator.Cursor do
   @moduledoc false
-  require Logger
-  @log_level :debug
+  import Where
 
   def maybe_encode([id: id] = attrs) do # workaround to use the ID as the cursor if that's the only cursor_field
     if is_id?(id) do
-      Logger.log(@log_level, "Paginator maybe_encode: just use the ID: #{id}")
+      debug(id, "Paginator maybe_encode: just use the ID")
 
       id
     else
@@ -25,7 +24,7 @@ defmodule Paginator.Cursor do
   end
 
   def encode(values) when is_map(values) do
-    Logger.log(@log_level, "Paginator maybe_encode: encode the cursor #{inspect values}")
+    debug(values, "Paginator maybe_encode: encode the cursor")
 
     values
     |> :erlang.term_to_binary()
@@ -41,7 +40,7 @@ defmodule Paginator.Cursor do
   def maybe_decode(nil), do: nil
   def maybe_decode(cursor) do # workaround to use the ID as the cursor if that's the only cursor_field
     if is_id?(cursor) do
-      Logger.log(@log_level, "Paginator maybe_decode: cursor provided is an ID: #{cursor}")
+      debug(cursor, "Paginator maybe_decode: cursor provided is an ID")
       %{id: cursor}
     else
       decode(cursor)
@@ -50,11 +49,12 @@ defmodule Paginator.Cursor do
 
   def decode(nil), do: nil
   def decode(encoded_cursor) do
-    Logger.log(@log_level, "Paginator maybe_decode: decode provided cursor #{inspect encoded_cursor}")
+    debug(encoded_cursor, "Paginator maybe_decode: decode provided cursor")
 
     encoded_cursor
     |> Base.url_decode64!()
     |> Plug.Crypto.non_executable_binary_to_term([:safe])
+    |> debug("cursor decoded")
   end
 
 
