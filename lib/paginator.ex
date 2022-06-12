@@ -338,8 +338,9 @@ defmodule Paginator do
   end
 
   defp paginated_queryable(queryable, config) do
-    queryable
-    |> Query.paginate(config)
+    debug(config)
+
+    Query.paginate(queryable, config)
     |> debug()
   end
 
