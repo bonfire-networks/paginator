@@ -1,6 +1,6 @@
 defmodule Paginator.Cursor do
   @moduledoc false
-  import Where
+  import Untangle
 
   def maybe_encode([id: id] = attrs) do # workaround to use the ID as the cursor if that's the only cursor_field
     if is_id?(id) do

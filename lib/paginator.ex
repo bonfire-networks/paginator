@@ -47,7 +47,7 @@ defmodule Paginator do
   """
 
   import Ecto.Query
-  import Where
+  import Untangle
   alias Paginator.{Config, Cursor, Ecto.Query, Page, PageInfo}
 
   defmacro __using__(opts) do
