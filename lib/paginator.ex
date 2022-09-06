@@ -338,10 +338,10 @@ defmodule Paginator do
   end
 
   defp paginated_queryable(queryable, config) do
-    debug(config)
+    # debug(config)
 
     Query.paginate(queryable, config)
-    |> debug()
+    # |> debug()
   end
 
   defp total_count(_queryable, %Config{include_total_count: false}, _repo, _repo_opts),
