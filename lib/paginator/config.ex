@@ -92,10 +92,13 @@ defmodule Paginator.Config do
     match?(^cursor_keys, sorted_cursor_fields)
   end
 
-  defp limit(opts) do
-    max(opts[:limit] || @default_limit, @minimum_limit)
+  def limit(opts) do
+    max(ensure_int(opts[:limit]) || @default_limit, @minimum_limit)
     |> min(opts[:maximum_limit] || @maximum_limit)
   end
+
+  defp ensure_int(num) when is_integer(num), do: num
+  defp ensure_int(num) when is_binary(num), do: String.to_integer(num)
 
   defp convert_deprecated_config(config) do
     case config do
