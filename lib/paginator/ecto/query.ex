@@ -2,7 +2,7 @@ defmodule Paginator.Ecto.Query do
   @moduledoc false
 
   import Ecto.Query
-  import Untangle
+  # import Untangle
   alias Paginator.Config
 
   def paginate(queryable, config \\ [])
