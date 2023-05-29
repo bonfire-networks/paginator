@@ -173,7 +173,7 @@ defmodule Paginator do
   @doc false
   def paginate(queryable, opts, repo, repo_opts) do
     config = Config.new(opts)
-    |> IO.inspect(label: "pagination_config")
+    # |> IO.inspect(label: "pagination_config")
     
     Config.validate!(config)
 
