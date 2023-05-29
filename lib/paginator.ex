@@ -173,7 +173,8 @@ defmodule Paginator do
   @doc false
   def paginate(queryable, opts, repo, repo_opts) do
     config = Config.new(opts)
-
+    |> IO.inspect(label: "pagination_config")
+    
     Config.validate!(config)
 
     sorted_entries = edges(queryable, config, repo, repo_opts)
@@ -327,6 +328,10 @@ defmodule Paginator do
     Enum.count(sorted_entries) <= limit
   end
 
+  
+  defp last_page?(sorted_entries, %Config{infinite_pages: true}) do
+    false
+  end
   defp last_page?(sorted_entries, %Config{limit: limit}) do
     Enum.count(sorted_entries) <= limit
   end
