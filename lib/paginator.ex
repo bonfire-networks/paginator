@@ -82,7 +82,7 @@ defmodule Paginator do
     number will be capped by `:maximum_limit`. Defaults to `50`.
     * `:maximum_limit` - Sets a maximum cap for `:limit`. This option can be useful when `:limit`
     is set dynamically (e.g from a URL param set by a user) but you still want to
-    enfore a maximum. Defaults to `500`.
+    enforce a maximum. Defaults to `500`.
     * `:sort_direction` - The direction used for sorting. Defaults to `:asc`.
     It is preferred to set the sorting direction per field in `:cursor_fields`.
     * `:total_count_limit` - Running count queries on tables with a large number
@@ -178,15 +178,17 @@ defmodule Paginator do
     Config.validate!(config)
 
     sorted_entries = edges(queryable, config, repo, repo_opts)
+    page_count = Enum.count(sorted_entries)
     paginated_entries = paginate_entries(sorted_entries, config)
     {total_count, total_count_cap_exceeded} = total_count(queryable, config, repo, repo_opts)
 
     %Page{
       edges: paginated_entries,
       page_info: %PageInfo{
-        start_cursor: before_cursor(paginated_entries, sorted_entries, config),
-        end_cursor: after_cursor(paginated_entries, sorted_entries, config),
+        start_cursor: before_cursor(paginated_entries, page_count, config),
+        end_cursor: after_cursor(paginated_entries, page_count, config),
         limit: config.limit,
+        page_count: page_count,
         total_count: total_count,
         total_count_cap_exceeded: total_count_cap_exceeded
       }
@@ -262,16 +264,16 @@ defmodule Paginator do
 
   defp before_cursor([], [], _config), do: nil
 
-  defp before_cursor(_paginated_entries, _sorted_entries, %Config{after: nil, before: nil}),
+  defp before_cursor(_paginated_entries, _, %Config{after: nil, before: nil}),
     do: nil
 
-  defp before_cursor(paginated_entries, _sorted_entries, %Config{after: c_after} = config)
+  defp before_cursor(paginated_entries, _, %Config{after: c_after} = config)
        when not is_nil(c_after) do
     first_or_nil(paginated_entries, config)
   end
 
-  defp before_cursor(paginated_entries, sorted_entries, config) do
-    if first_page?(sorted_entries, config) do
+  defp before_cursor(paginated_entries, page_count, config) do
+    if first_page?(page_count, config) do
       nil
     else
       first_or_nil(paginated_entries, config)
@@ -288,13 +290,13 @@ defmodule Paginator do
 
   defp after_cursor([], [], _config), do: nil
 
-  defp after_cursor(paginated_entries, _sorted_entries, %Config{before: c_before} = config)
+  defp after_cursor(paginated_entries, _, %Config{before: c_before} = config)
        when not is_nil(c_before) do
     last_or_nil(paginated_entries, config)
   end
 
-  defp after_cursor(paginated_entries, sorted_entries, config) do
-    if last_page?(sorted_entries, config) do
+  defp after_cursor(paginated_entries, page_count, config) do
+    if last_page?(page_count, config) do
       nil
     else
       last_or_nil(paginated_entries, config)
@@ -324,16 +326,15 @@ defmodule Paginator do
     |> Cursor.maybe_encode()
   end
 
-  defp first_page?(sorted_entries, %Config{limit: limit}) do
-    Enum.count(sorted_entries) <= limit
+  defp first_page?(page_count, %Config{limit: limit}) do
+    page_count <= limit
   end
 
-  
-  defp last_page?(sorted_entries, %Config{infinite_pages: true}) do
+  defp last_page?(_, %Config{infinite_pages: true}) do
     false
   end
-  defp last_page?(sorted_entries, %Config{limit: limit}) do
-    Enum.count(sorted_entries) <= limit
+  defp last_page?(page_count, %Config{limit: limit}) do
+    page_count <= limit
   end
 
   defp edges(queryable, config, repo, repo_opts) do
@@ -404,7 +405,7 @@ defmodule Paginator do
   # returning the page, we want to take only the first (limit).
   #
   # When we have only a before cursor, we get our results from
-  # sorted_entries in reverse order due t
+  # sorted_entries in reverse order 
   defp paginate_entries(sorted_entries, %Config{before: before, after: nil, limit: limit})
        when not is_nil(before) do
     sorted_entries
