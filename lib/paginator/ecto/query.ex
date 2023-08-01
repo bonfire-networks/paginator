@@ -2,7 +2,7 @@ defmodule Paginator.Ecto.Query do
   @moduledoc false
 
   import Ecto.Query
-  # import Untangle
+  import Untangle
   alias Paginator.Config
 
   def paginate(queryable, config \\ [])
@@ -54,29 +54,34 @@ defmodule Paginator.Ecto.Query do
       fields
       |> Enum.map(fn {column, _order} -> {column, Map.get(values, column)} end)
       |> Enum.reject(fn val -> match?({_column, nil}, val) end)
+      |> debug("sorts")
 
     dynamic_sorts =
       sorts
       |> Enum.with_index()
-      |> Enum.reduce(true, fn {{bound_column, value}, i}, dynamic_sorts ->
+      |> Enum.reduce(true, fn {{column_field, value}, i}, dynamic_sorts ->
+        
+        bound_column = Config.sorted_cursor_field(column_field)
+
         {position, column} = column_position(query, bound_column)
 
         dynamic = true
 
         dynamic =
-          case get_operator_for_field(fields, bound_column, cursor_direction) do
+          case get_operator_for_field(fields, column_field, cursor_direction) do
             :lt ->
-              dynamic([{q, position}], field(q, ^column) < ^value and ^dynamic)
+              dynamic([{q, position}], (field(q, ^column) < ^value or is_nil(field(q, ^column))) and ^dynamic)
 
             :gt ->
-              dynamic([{q, position}], field(q, ^column) > ^value and ^dynamic)
+              dynamic([{q, position}], (field(q, ^column) > ^value or is_nil(field(q, ^column))) and ^dynamic)
           end
 
         dynamic =
           sorts
           |> Enum.take(i)
           |> Enum.reduce(dynamic, fn {prev_column, prev_value}, dynamic ->
-            {position, prev_column} = column_position(query, prev_column)
+            prev_bound_column = Config.sorted_cursor_field(prev_column)
+            {position, prev_column} = column_position(query, prev_bound_column)
             dynamic([{q, position}], field(q, ^prev_column) == ^prev_value and ^dynamic)
           end)
 
@@ -133,6 +138,7 @@ defmodule Paginator.Ecto.Query do
         {position, column}
 
       _ ->
+      warn(query)
         raise(
           ArgumentError,
           "Could not find binding `#{binding_name}` in query aliases: #{inspect(query.aliases)}"

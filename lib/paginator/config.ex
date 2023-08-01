@@ -2,6 +2,7 @@ defmodule Paginator.Config do
   @moduledoc false
 
   alias Paginator.Cursor
+  import Untangle
 
   @type t :: %__MODULE__{}
 
@@ -16,7 +17,6 @@ defmodule Paginator.Config do
     :total_count_primary_key_field,
     :limit,
     :maximum_limit,
-    :sort_direction,
     :total_count_limit,
     :infinite_pages
   ]
@@ -41,23 +41,25 @@ defmodule Paginator.Config do
       total_count_primary_key_field:
         opts[:total_count_primary_key_field] || @default_total_count_primary_key_field,
       limit: limit(opts),
-      sort_direction: opts[:sort_direction],
       total_count_limit: opts[:total_count_limit] || @default_total_count_limit,
       infinite_pages: opts[:infinite_pages] || false
     }
-    |> convert_deprecated_config()
   end
 
   def validate!(%__MODULE__{} = config) do
-    unless config.cursor_fields do
+    cursor_fields = config.cursor_fields
+
+    unless cursor_fields do
       raise(ArgumentError, "expected `:cursor_fields` to be set")
     end
 
-    if !cursor_values_match_cursor_fields?(config.after_values, config.cursor_fields) do
+    if !cursor_values_match_cursor_fields?(config.after_values, cursor_fields) do
+      warn(cursor_fields)
       raise(ArgumentError, message: "expected `:after` cursor to match `:cursor_fields`")
     end
 
-    if !cursor_values_match_cursor_fields?(config.before_values, config.cursor_fields) do
+    if !cursor_values_match_cursor_fields?(config.before_values, cursor_fields) do
+      warn(cursor_fields)
       raise(ArgumentError, message: "expected `:before` cursor to match `:cursor_fields`")
     end
   end
@@ -71,27 +73,48 @@ defmodule Paginator.Config do
   end
 
   defp cursor_values_match_cursor_fields?(cursor_values, cursor_fields) do
-    cursor_keys = cursor_values |> Map.keys() |> Enum.sort()
+    cursor_keys = cursor_values |> Map.keys() |> sorted_cursor_fields() # |> Enum.sort()
 
-    sorted_cursor_fields =
+    match?(^cursor_keys, sorted_cursor_fields_with_direction(cursor_fields))
+  end
+
+  def sorted_cursor_fields_with_direction(cursor_fields) do
       cursor_fields
       |> Enum.map(fn
-        {field, value} when is_atom(field) and value in @order_directions ->
-          field
-
-        {{schema, field}, value}
-        when is_atom(schema) and is_atom(field) and value in @order_directions ->
-          {schema, field}
+        {field, value} when value in @order_directions ->
+          sorted_cursor_field(field)
 
         field when is_atom(field) ->
           field
 
-        {schema, field} when is_atom(schema) and is_atom(field) ->
-          {schema, field}
       end)
       |> Enum.sort()
+  end
 
-    match?(^cursor_keys, sorted_cursor_fields)
+  def sorted_cursor_fields(cursor_fields) do
+      cursor_fields
+      |> Enum.map(&sorted_cursor_field/1)
+      |> Enum.sort()
+  end
+  def sorted_cursor_field(cursor_field) do
+      case cursor_field do
+
+        {schema, field}
+        when is_atom(schema) and is_atom(field) ->
+          {schema, field}
+
+      {_schema, assoc, field}
+        when is_atom(assoc) and is_atom(field)  ->
+          {assoc, field}
+
+        {_schema, _assoc, assoc2, field}
+        when is_atom(assoc2) and is_atom(field)  ->
+          {assoc2, field}
+
+        field when is_atom(field) ->
+          field
+
+      end
   end
 
   def limit(opts) do
@@ -101,33 +124,6 @@ defmodule Paginator.Config do
 
   defp ensure_int(num) when is_integer(num), do: num
   defp ensure_int(num) when is_binary(num), do: String.to_integer(num)
+  defp ensure_int(_), do: @default_limit
 
-  defp convert_deprecated_config(config) do
-    case config do
-      %__MODULE__{sort_direction: nil} ->
-        %{
-          config
-          | cursor_fields: build_cursor_fields_from_sort_direction(config.cursor_fields, :asc)
-        }
-
-      %__MODULE__{sort_direction: direction} ->
-        %{
-          config
-          | cursor_fields:
-              build_cursor_fields_from_sort_direction(config.cursor_fields, direction),
-            sort_direction: nil
-        }
-    end
-  end
-
-  defp build_cursor_fields_from_sort_direction(nil, _sorting_direction), do: nil
-
-  defp build_cursor_fields_from_sort_direction(fields, sorting_direction) do
-    Enum.map(fields, fn
-      {{_binding, _column}, _direction} = field -> field
-      {_column, direction} = field when direction in @order_directions -> field
-      {_binding, _column} = field -> {field, sorting_direction}
-      field -> {field, sorting_direction}
-    end)
-  end
 end

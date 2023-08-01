@@ -47,7 +47,7 @@ defmodule Paginator do
   """
 
   import Ecto.Query
-  # import Untangle
+  import Untangle
   alias Paginator.{Config, Cursor, Ecto.Query, Page, PageInfo}
 
   defmacro __using__(opts) do
@@ -83,8 +83,6 @@ defmodule Paginator do
     * `:maximum_limit` - Sets a maximum cap for `:limit`. This option can be useful when `:limit`
     is set dynamically (e.g from a URL param set by a user) but you still want to
     enforce a maximum. Defaults to `500`.
-    * `:sort_direction` - The direction used for sorting. Defaults to `:asc`.
-    It is preferred to set the sorting direction per field in `:cursor_fields`.
     * `:total_count_limit` - Running count queries on tables with a large number
     of records is expensive so it is capped by default. Can be set to `:infinity`
     in order to count all the records. Defaults to `10,000`.
@@ -172,14 +170,11 @@ defmodule Paginator do
 
   @doc false
   def paginate(queryable, opts, repo, repo_opts) do
-    config = Config.new(opts)
-    # |> IO.inspect(label: "pagination_config")
-    
-    Config.validate!(config)
+    config = prepare_config(opts)
 
     sorted_entries = edges(queryable, config, repo, repo_opts)
     page_count = Enum.count(sorted_entries)
-    paginated_entries = paginate_entries(sorted_entries, config)
+    paginated_entries = take_paginated_entries(sorted_entries, config)
     {total_count, total_count_cap_exceeded} = total_count(queryable, config, repo, repo_opts)
 
     %Page{
@@ -188,7 +183,7 @@ defmodule Paginator do
         start_cursor: before_cursor(paginated_entries, page_count, config),
         end_cursor: after_cursor(paginated_entries, page_count, config),
         limit: config.limit,
-        page_count: page_count,
+        page_count: Enum.count(paginated_entries),
         total_count: total_count,
         total_count_cap_exceeded: total_count_cap_exceeded
       }
@@ -196,13 +191,22 @@ defmodule Paginator do
   end
 
   def paginated_query(queryable, opts) do
-    config = Config.new(opts)
-
-    Config.validate!(config)
+    config = prepare_config(opts)
 
     queryable
     |> paginated_queryable(config)
   end
+
+  defp prepare_config(opts) do
+    config = opts
+          |> debug("pagination_opts")
+    |> Config.new()
+          |> debug("pagination_config")
+
+    Config.validate!(config)
+
+    config
+    end
 
   @doc """
   Generate a cursor for the supplied record, in the same manner as the
@@ -347,7 +351,7 @@ defmodule Paginator do
     # debug(config)
 
     Query.paginate(queryable, config)
-    # |> debug()
+    |> debug()
   end
 
   defp total_count(_queryable, %Config{include_total_count: false}, _repo, _repo_opts),
@@ -406,14 +410,14 @@ defmodule Paginator do
   #
   # When we have only a before cursor, we get our results from
   # sorted_entries in reverse order 
-  defp paginate_entries(sorted_entries, %Config{before: before, after: nil, limit: limit})
+  defp take_paginated_entries(sorted_entries, %Config{before: before, after: nil, limit: limit})
        when not is_nil(before) do
     sorted_entries
     |> Enum.take(limit)
     |> Enum.reverse()
   end
 
-  defp paginate_entries(sorted_entries, %Config{limit: limit}) do
+  defp take_paginated_entries(sorted_entries, %Config{limit: limit}) do
     Enum.take(sorted_entries, limit)
   end
 end
