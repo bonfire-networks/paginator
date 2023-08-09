@@ -54,12 +54,12 @@ defmodule Paginator.Config do
     end
 
     if !cursor_values_match_cursor_fields?(config.after_values, cursor_fields) do
-      warn(cursor_fields)
+      warn(cursor_fields, "cursor_fields")
       raise(ArgumentError, message: "expected `:after` cursor to match `:cursor_fields`")
     end
 
     if !cursor_values_match_cursor_fields?(config.before_values, cursor_fields) do
-      warn(cursor_fields)
+      warn(cursor_fields, "cursor_fields")
       raise(ArgumentError, message: "expected `:before` cursor to match `:cursor_fields`")
     end
   end
