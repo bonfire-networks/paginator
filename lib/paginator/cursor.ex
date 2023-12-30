@@ -59,8 +59,8 @@ defmodule Paginator.Cursor do
 
 
   def is_id?(str) when is_binary(str) and byte_size(str)==26 do
-    if Code.ensure_loaded?(Pointers.ULID) do
-      with :error <- Pointers.ULID.cast(str) do
+    if Code.ensure_loaded?(Needle.ULID) do
+      with :error <- Needle.ULID.cast(str) do
         false
       else
         _ -> true

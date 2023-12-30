@@ -47,8 +47,8 @@ defmodule Paginator.Mixfile do
       {:inch_ex, "~> 2.0", only: [:dev, :test]},
       {:postgrex, "~> 0.13", optional: true},
       {:plug_crypto, "~> 1.2.0"},
-      {:pointers_ulid, git: "https://github.com/bonfire-networks/pointers_ulid", branch: "main", optional: true},
-      {:untangle, git: "https://github.com/bonfire-networks/untangle", branch: "main"}
+      {:needle_ulid, git: "https://github.com/bonfire-networks/needle_ulid", branch: "main", optional: true},
+      {:untangle, "~> 0.3"}
     ]
   end
 
