@@ -23,5 +23,5 @@ defmodule Paginator.PageInfo do
           total_count_cap_exceeded: boolean() | nil
         }
 
-  defstruct [:start_cursor, :end_cursor, :limit, :page_count, :total_count, :total_count_cap_exceeded]
+  defstruct [:start_cursor, :end_cursor, :limit, :page_count, :total_count, :total_count_cap_exceeded, :cursor_for_record_fun]
 end

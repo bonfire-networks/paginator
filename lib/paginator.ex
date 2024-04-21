@@ -185,7 +185,13 @@ defmodule Paginator do
         limit: config.limit,
         page_count: Enum.count(paginated_entries),
         total_count: total_count,
-        total_count_cap_exceeded: total_count_cap_exceeded
+        total_count_cap_exceeded: total_count_cap_exceeded,
+        cursor_for_record_fun: fn record -> cursor_for_record(
+          record,
+          config.cursor_fields,
+          config.fetch_cursor_value_fun
+        )
+      end
       }
     }
   end
