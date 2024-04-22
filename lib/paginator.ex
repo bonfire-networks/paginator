@@ -205,9 +205,9 @@ defmodule Paginator do
 
   defp prepare_config(opts) do
     config = opts
-          |> debug("pagination_opts")
+    # |> debug("pagination_opts")
     |> Config.new()
-          |> debug("pagination_config")
+    |> debug("pagination_config")
 
     Config.validate!(config)
 
