@@ -47,7 +47,7 @@ defmodule Paginator.Mixfile do
       {:inch_ex, "~> 2.0", only: [:dev, :test]},
       {:postgrex, "~> 0.13", optional: true},
       {:plug_crypto, "~> 2.0"},
-      {:needle_ulid, "~> 0.3", optional: true},
+      {:needle_uid, "~> 0.1", optional: true},
       {:untangle, "~> 0.3"}
     ]
   end
