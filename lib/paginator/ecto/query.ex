@@ -118,7 +118,7 @@ defmodule Paginator.Ecto.Query do
        }) do
     query
     |> filter_values(cursor_fields, before_values, :before)
-    |> reverse_order_bys()
+    |> Ecto.Query.reverse_order()
   end
 
   defp maybe_where(query, %Config{
@@ -155,23 +155,29 @@ defmodule Paginator.Ecto.Query do
     limit + 1
   end
 
-  # This code was taken from https://github.com/elixir-ecto/ecto/blob/v2.1.4/lib/ecto/query.ex#L1212-L1226
-  defp reverse_order_bys(query) do
-    update_in(query.order_bys, fn
-      [] ->
-        []
+  # This code was based on https://github.com/elixir-ecto/ecto/blob/v2.1.4/lib/ecto/query.ex#L1212-L1226
+  # defp reverse_order_bys(query) do
+  #   update_in(query.order_bys, fn
+  #     [] ->
+  #       []
 
-      order_bys ->
-        for %{expr: expr} = order_by <- order_bys do
-          %{
-            order_by
-            | expr:
-                Enum.map(expr, fn
-                  {:desc, ast} -> {:asc, ast}
-                  {:asc, ast} -> {:desc, ast}
-                end)
-          }
-        end
-    end)
-  end
+  #     order_bys ->
+  #       for %{expr: expr} = order_by <- order_bys do
+  #         %{
+  #           order_by
+  #           | expr:
+  #               Enum.map(expr, fn
+  #                 {:desc, ast} -> {:asc, ast}
+  #                 {:asc, ast} -> {:desc, ast}
+  #                 {:desc_nulls_first, ast} -> {:asc_nulls_last, ast}
+  #                 {:desc_nulls_last, ast} -> {:asc_nulls_first, ast}
+  #                 {:asc_nulls_first, ast} -> {:desc_nulls_last, ast}
+  #                 {:asc_nulls_last, ast} -> {:desc_nulls_first, ast}
+  #                 other -> error(other, "Could not paginate because the system could not recognise the query order")
+  #                 raise "Could not paginate because the system could not recognise the query order"
+  #               end)
+  #         }
+  #       end
+  #   end)
+  # end
 end
