@@ -17,11 +17,12 @@ defmodule Paginator.PageInfo do
   @type t :: %__MODULE__{
           start_cursor: opaque_cursor() | nil,
           end_cursor: opaque_cursor() | nil,
+          final_cursor: opaque_cursor() | nil,
           limit: integer(),
           page_count: integer() | nil,
           total_count: integer() | nil,
           total_count_cap_exceeded: boolean() | nil
         }
 
-  defstruct [:start_cursor, :end_cursor, :limit, :page_count, :total_count, :total_count_cap_exceeded, :cursor_for_record_fun]
+  defstruct [:start_cursor, :end_cursor, :final_cursor, :limit, :page_count, :total_count, :total_count_cap_exceeded, :cursor_for_record_fun]
 end

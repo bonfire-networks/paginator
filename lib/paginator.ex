@@ -173,15 +173,22 @@ defmodule Paginator do
     config = prepare_config(opts)
 
     sorted_entries = edges(queryable, config, repo, repo_opts)
-    page_count = Enum.count(sorted_entries)
+    |> debug("sorted_entries")
+    sorted_page_count = Enum.count(sorted_entries)
+    |> debug("sorted_page_count")
     paginated_entries = take_paginated_entries(sorted_entries, config)
     {total_count, total_count_cap_exceeded} = total_count(queryable, config, repo, repo_opts)
+
+    last_cursor = after_cursor(paginated_entries, sorted_page_count, config)
+    last_page? = last_page?(sorted_page_count, config)
+    |> debug("last_page?")
 
     %Page{
       edges: paginated_entries,
       page_info: %PageInfo{
-        start_cursor: before_cursor(paginated_entries, page_count, config),
-        end_cursor: after_cursor(paginated_entries, page_count, config),
+        start_cursor: before_cursor(paginated_entries, sorted_page_count, config),
+        end_cursor: (if !last_page?, do: last_cursor),
+        final_cursor: (if last_page?, do: last_cursor),
         limit: config.limit,
         page_count: Enum.count(paginated_entries),
         total_count: total_count,
@@ -306,18 +313,16 @@ defmodule Paginator do
   end
 
   defp after_cursor(paginated_entries, page_count, config) do
-    if last_page?(page_count, config) do
-      nil
-    else
+    # if last_page?(page_count, config) do
+    #   nil
+    # else
       last_or_nil(paginated_entries, config)
-    end
+    # end
   end
 
   defp last_or_nil(edges, config) do
     if last = List.last(edges) do
       fetch_cursor_value(last, config)
-    else
-      nil
     end
   end
 
@@ -340,9 +345,6 @@ defmodule Paginator do
     page_count <= limit
   end
 
-  defp last_page?(_, %Config{infinite_pages: true}) do
-    false
-  end
   defp last_page?(page_count, %Config{limit: limit}) do
     page_count <= limit
   end

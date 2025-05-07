@@ -18,7 +18,7 @@ defmodule Paginator.Config do
     :limit,
     :maximum_limit,
     :total_count_limit,
-    :infinite_pages
+    # :infinite_pages
   ]
 
   @default_total_count_primary_key_field :id
@@ -42,7 +42,7 @@ defmodule Paginator.Config do
         opts[:total_count_primary_key_field] || @default_total_count_primary_key_field,
       limit: limit(opts),
       total_count_limit: opts[:total_count_limit] || @default_total_count_limit,
-      infinite_pages: opts[:infinite_pages] || false
+      # infinite_pages: opts[:infinite_pages] || false
     }
   end
 
