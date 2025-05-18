@@ -173,7 +173,7 @@ defmodule Paginator do
     config = prepare_config(opts)
 
     sorted_entries = edges(queryable, config, repo, repo_opts)
-    |> debug("sorted_entries")
+    # |> debug("sorted_entries")
     sorted_page_count = Enum.count(sorted_entries)
     |> debug("sorted_page_count")
     paginated_entries = take_paginated_entries(sorted_entries, config)
