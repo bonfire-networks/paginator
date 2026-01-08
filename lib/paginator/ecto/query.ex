@@ -13,6 +13,7 @@ defmodule Paginator.Ecto.Query do
     queryable
     |> maybe_where(config)
     |> limit(^query_limit(config))
+    |> flood("paginated query")
   end
 
   def paginate(queryable, opts) do

@@ -249,13 +249,9 @@ defmodule Paginator do
   end
 
   @doc """
-  Default function used to get the value of a cursor field from the supplied
-  map. This function can be overriden in the `Paginator.Config` using the
-  `fetch_cursor_value_fun` key.
+  Default function used to get the value of a cursor field from the supplied map. This function can be overriden in the `Paginator.Config` using the `fetch_cursor_value_fun` key.
 
-  When using named bindings to sort on joined columns it will attempt to get
-  the value of joined column by using the named binding as the name of the
-  relationship on the original Ecto.Schema.
+  When using named bindings to sort on joined columns it will attempt to get the value of joined column by using the named binding as the name of the relationship on the original Ecto.Schema.
 
   ### Example
 
@@ -356,10 +352,7 @@ defmodule Paginator do
   end
 
   defp paginated_queryable(queryable, config) do
-    # debug(config)
-
     Query.paginate(queryable, config)
-    |> debug()
   end
 
   defp total_count(_queryable, %Config{include_total_count: false}, _repo, _repo_opts),
