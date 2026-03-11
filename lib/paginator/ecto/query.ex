@@ -26,6 +26,11 @@ defmodule Paginator.Ecto.Query do
   defp get_operator(:asc, :after), do: :gt
   defp get_operator(:desc, :after), do: :lt
 
+  defp get_operator(:asc, :after_inclusive), do: :gte
+  defp get_operator(:desc, :after_inclusive), do: :lte
+  defp get_operator(:asc, :before_inclusive), do: :lte
+  defp get_operator(:desc, :before_inclusive), do: :gte
+
   defp get_operator(direction, _),
     do: raise("Invalid sorting value :#{direction}, please use either :asc or :desc")
 
@@ -75,6 +80,12 @@ defmodule Paginator.Ecto.Query do
 
             :gt ->
               dynamic([{q, position}], (field(q, ^column) > ^value or is_nil(field(q, ^column))) and ^dynamic)
+
+            :lte ->
+              dynamic([{q, position}], (field(q, ^column) <= ^value or is_nil(field(q, ^column))) and ^dynamic)
+
+            :gte ->
+              dynamic([{q, position}], (field(q, ^column) >= ^value or is_nil(field(q, ^column))) and ^dynamic)
           end
 
         dynamic =
@@ -106,30 +117,37 @@ defmodule Paginator.Ecto.Query do
   defp maybe_where(query, %Config{
          after_values: after_values,
          before: nil,
-         cursor_fields: cursor_fields
+         cursor_fields: cursor_fields,
+         cursor_inclusive: inclusive
        }) do
+    dir = if inclusive, do: :after_inclusive, else: :after
     query
-    |> filter_values(cursor_fields, after_values, :after)
+    |> filter_values(cursor_fields, after_values, dir)
   end
 
   defp maybe_where(query, %Config{
          after: nil,
          before_values: before_values,
-         cursor_fields: cursor_fields
+         cursor_fields: cursor_fields,
+         cursor_inclusive: inclusive
        }) do
+    dir = if inclusive, do: :before_inclusive, else: :before
     query
-    |> filter_values(cursor_fields, before_values, :before)
+    |> filter_values(cursor_fields, before_values, dir)
     |> Ecto.Query.reverse_order()
   end
 
   defp maybe_where(query, %Config{
          after_values: after_values,
          before_values: before_values,
-         cursor_fields: cursor_fields
+         cursor_fields: cursor_fields,
+         cursor_inclusive: inclusive
        }) do
+    after_dir = if inclusive, do: :after_inclusive, else: :after
+    before_dir = if inclusive, do: :before_inclusive, else: :before
     query
-    |> filter_values(cursor_fields, after_values, :after)
-    |> filter_values(cursor_fields, before_values, :before)
+    |> filter_values(cursor_fields, after_values, after_dir)
+    |> filter_values(cursor_fields, before_values, before_dir)
   end
 
   # Lookup position of binding in query aliases

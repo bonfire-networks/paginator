@@ -18,6 +18,7 @@ defmodule Paginator.Config do
     :limit,
     :maximum_limit,
     :total_count_limit,
+    :cursor_inclusive,
     # :infinite_pages
   ]
 
@@ -42,6 +43,7 @@ defmodule Paginator.Config do
         opts[:total_count_primary_key_field] || @default_total_count_primary_key_field,
       limit: limit(opts),
       total_count_limit: opts[:total_count_limit] || @default_total_count_limit,
+      cursor_inclusive: opts[:cursor_inclusive] || false,
       # infinite_pages: opts[:infinite_pages] || false
     }
   end
