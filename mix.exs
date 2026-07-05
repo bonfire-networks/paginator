@@ -51,7 +51,7 @@ defmodule Paginator.Mixfile do
         "~> 0.0.2",
         # git: "https://github.com/bonfire-networks/needle_uid",
         optional: true},
-      {:untangle, "~> 0.3"}
+      {:untangle, "~> 0.5"}
     ]
   end
 
