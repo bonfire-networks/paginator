@@ -94,9 +94,11 @@ defmodule Paginator do
 
   ## Simple example
 
+  Each cursor field needs the direction it is sorted in, matching the query's `order_by`.
+
       query = from(p in Post, order_by: [asc: p.inserted_at, asc: p.id], select: p)
 
-      Repo.paginate(query, cursor_fields: [:inserted_at, :id], limit: 50)
+      Repo.paginate(query, cursor_fields: [inserted_at: :asc, id: :asc], limit: 50)
 
   ## Example with using custom sort directions per field
 
@@ -230,11 +232,11 @@ defmodule Paginator do
 
   ### Example
 
-      iex> Paginator.cursor_for_record(%Paginator.Customer{id: 1}, [:id])
-      "g3QAAAABZAACaWRhAQ=="
+      iex> Paginator.cursor_for_record(%Paginator.Customer{id: 1}, id: :asc) |> Paginator.Cursor.maybe_decode()
+      %{id: 1}
 
-      iex> Paginator.cursor_for_record(%Paginator.Customer{id: 1, name: "Alice"}, [id: :asc, name: :desc])
-      "g3QAAAACZAACaWRhAWQABG5hbWVtAAAABUFsaWNl"
+      iex> Paginator.cursor_for_record(%Paginator.Customer{id: 1, name: "Alice"}, id: :asc, name: :desc) |> Paginator.Cursor.maybe_decode()
+      %{id: 1, name: "Alice"}
   """
   @spec cursor_for_record(any(), [atom() | {atom(), atom()}], (map(), atom() | {atom(), atom()} -> any())) :: binary()
   def cursor_for_record(

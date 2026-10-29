@@ -5,7 +5,7 @@ defmodule Paginator.ConfigTest do
 
   describe "Config.new/2" do
     test "creates a new config" do
-      config = Config.new(cursor_fields: [:id], limit: 10)
+      config = Config.new(cursor_fields: [id: :asc], limit: 10)
 
       assert config.after_values == nil
       assert config.before_values == nil
@@ -15,12 +15,12 @@ defmodule Paginator.ConfigTest do
   end
 
   describe "Config.new/2 applies sort_fields" do
-    test "applies column fields with default direction" do
-      config = Config.new(cursor_fields: [:id])
+    # fields need an explicit direction: there is no default, and `sort_direction` is gone
+    test "keeps the direction given for each column field" do
+      config = Config.new(cursor_fields: [id: :desc, created_at: :asc])
 
-      assert config.cursor_fields == [id: :asc]
+      assert config.cursor_fields == [id: :desc, created_at: :asc]
     end
-
   end
 
   describe "Config.new/2 applies min/max limit" do
@@ -51,7 +51,7 @@ defmodule Paginator.ConfigTest do
 
   describe "Config.new/2 decodes cusors" do
     test "simple before" do
-      config = Config.new(limit: 10, cursor_fields: [:id], before: simple_before())
+      config = Config.new(limit: 10, cursor_fields: [id: :asc], before: simple_before())
 
       assert config.after_values == nil
       assert config.before_values == %{id: "pay_789"}
@@ -60,7 +60,7 @@ defmodule Paginator.ConfigTest do
     end
 
     test "simple after" do
-      config = Config.new(limit: 10, cursor_fields: [:id], after: simple_after())
+      config = Config.new(limit: 10, cursor_fields: [id: :asc], after: simple_after())
 
       assert config.after_values == %{id: "pay_123"}
       assert config.before_values == nil
@@ -69,7 +69,12 @@ defmodule Paginator.ConfigTest do
     end
 
     test "complex before" do
-      config = Config.new(limit: 10, cursor_fields: [:created_at, :id], before: complex_before())
+      config =
+        Config.new(
+          limit: 10,
+          cursor_fields: [created_at: :asc, id: :asc],
+          before: complex_before()
+        )
 
       assert config.after_values == nil
       assert config.before_values == %{date: "2036-02-09T20:00:00.000Z", id: "pay_789"}
@@ -78,7 +83,12 @@ defmodule Paginator.ConfigTest do
     end
 
     test "complex after" do
-      config = Config.new(limit: 10, cursor_fields: [:created_at, :id], after: complex_after())
+      config =
+        Config.new(
+          limit: 10,
+          cursor_fields: [created_at: :asc, id: :asc],
+          after: complex_after()
+        )
 
       assert config.after_values == %{date: "2036-02-09T20:00:00.000Z", id: "pay_123"}
       assert config.before_values == nil
@@ -97,7 +107,7 @@ defmodule Paginator.ConfigTest do
     end
 
     test "raises ArgumentError when after cursor does not match the cursor_fields" do
-      config = Config.new(cursor_fields: [:date], after: complex_after())
+      config = Config.new(cursor_fields: [date: :asc], after: complex_after())
 
       assert_raise ArgumentError, "expected `:after` cursor to match `:cursor_fields`", fn ->
         Config.validate!(config)
@@ -107,7 +117,7 @@ defmodule Paginator.ConfigTest do
     test "raises ArgumentError when after cursor does not match cursor_fields with schema" do
       config =
         Config.new(
-          cursor_fields: [{:person, :first_name}, {{:person, :last_name}, :asc}],
+          cursor_fields: [{{:person, :first_name}, :asc}, {{:person, :last_name}, :asc}],
           after:
             Cursor.maybe_encode(%{
               {:person, :first_name} => "Test 121",
@@ -123,7 +133,7 @@ defmodule Paginator.ConfigTest do
     test "ok when after cursor matches cursor_fields with schema" do
       config =
         Config.new(
-          cursor_fields: [{:person, :first_name}, {{:person, :last_name}, :asc}],
+          cursor_fields: [{{:person, :first_name}, :asc}, {{:person, :last_name}, :asc}],
           after:
             Cursor.maybe_encode(%{
               {:person, :first_name} => "Test 121",
@@ -135,7 +145,7 @@ defmodule Paginator.ConfigTest do
     end
 
     test "raises ArgumentError when before cursor does not match the cursor_fields" do
-      config = Config.new(cursor_fields: [:id], before: complex_before())
+      config = Config.new(cursor_fields: [id: :asc], before: complex_before())
 
       assert_raise ArgumentError, "expected `:before` cursor to match `:cursor_fields`", fn ->
         Config.validate!(config)

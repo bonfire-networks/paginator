@@ -9,7 +9,7 @@ defmodule PaginatorTest do
   test "paginates forward", %{
     payments: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
   } do
-    opts = [cursor_fields: [:charged_at, :id], sort_direction: :asc, limit: 4]
+    opts = [cursor_fields: [charged_at: :asc, id: :asc], limit: 4]
 
     page = payments_by_charged_at() |> Repo.paginate(opts)
     assert to_ids(page.edges) == to_ids([p5, p4, p1, p6])
@@ -27,7 +27,7 @@ defmodule PaginatorTest do
   test "paginates forward with legacy cursor", %{
     payments: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
   } do
-    opts = [cursor_fields: [:charged_at, :id], sort_direction: :asc, limit: 4]
+    opts = [cursor_fields: [charged_at: :asc, id: :asc], limit: 4]
 
     page = payments_by_charged_at() |> Repo.paginate(opts)
     assert to_ids(page.edges) == to_ids([p5, p4, p1, p6])
@@ -53,7 +53,7 @@ defmodule PaginatorTest do
   test "paginates backward", %{
     payments: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
   } do
-    opts = [cursor_fields: [:charged_at, :id], sort_direction: :asc, limit: 4]
+    opts = [cursor_fields: [charged_at: :asc, id: :asc], limit: 4]
 
     page =
       payments_by_charged_at()
@@ -68,18 +68,39 @@ defmodule PaginatorTest do
 
     page = payments_by_charged_at() |> Repo.paginate(opts ++ [before: page.page_info.start_cursor])
     assert to_ids(page.edges) == to_ids([p5, p4, p1])
-    assert page.page_info.end_cursor == encode_cursor(%{charged_at: p1.charged_at, id: p1.id})
+    assert page.page_info.end_cursor == nil
+    assert page.page_info.final_cursor == encode_cursor(%{charged_at: p1.charged_at, id: p1.id})
     assert page.page_info.start_cursor == nil
   end
 
   test "returns an empty page when there are no results" do
     page =
       payments_by_status("failed")
-      |> Repo.paginate(cursor_fields: [:charged_at, :id], limit: 10)
+      |> Repo.paginate(cursor_fields: [charged_at: :asc, id: :asc], limit: 10)
 
     assert page.edges == []
     assert page.page_info.end_cursor == nil
     assert page.page_info.start_cursor == nil
+  end
+
+  test "reports page_count, final_cursor and a per-record cursor function", %{
+    payments: {_p1, _p2, _p3, _p4, _p5, _p6, _p7, _p8, _p9, _p10, p11, _p12}
+  } do
+    opts = [cursor_fields: [charged_at: :asc, id: :asc], limit: 8]
+
+    page = payments_by_charged_at() |> Repo.paginate(opts)
+    assert page.page_info.page_count == 8
+    assert page.page_info.final_cursor == nil
+
+    [first | _] = page.edges
+
+    assert page.page_info.cursor_for_record_fun.(first) ==
+             encode_cursor(%{charged_at: first.charged_at, id: first.id})
+
+    page = payments_by_charged_at() |> Repo.paginate(opts ++ [after: page.page_info.end_cursor])
+    assert page.page_info.page_count == 4
+    assert page.page_info.end_cursor == nil
+    assert page.page_info.final_cursor == encode_cursor(%{charged_at: p11.charged_at, id: p11.id})
   end
 
   describe "paginate a collection of payments, sorting by charged_at" do
@@ -88,10 +109,10 @@ defmodule PaginatorTest do
     } do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
-        |> Repo.paginate(cursor_fields: [:charged_at, :id], sort_direction: :asc, limit: 50)
+        |> Repo.paginate(cursor_fields: [charged_at: :asc, id: :asc], limit: 50)
 
       assert to_ids(edges) == to_ids([p5, p4, p1, p6, p7, p3, p10, p2, p12, p8, p9, p11])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
     end
 
     test "sorts ascending with before cursor", %{
@@ -100,16 +121,15 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :asc,
+          cursor_fields: [charged_at: :asc, id: :asc],
           before: encode_cursor(%{charged_at: p9.charged_at, id: p9.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([p1, p6, p7, p3, p10, p2, p12, p8])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{charged_at: p8.charged_at, id: p8.id}),
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{charged_at: p8.charged_at, id: p8.id}),
                start_cursor: encode_cursor(%{charged_at: p1.charged_at, id: p1.id}),
                limit: 8
              }
@@ -121,16 +141,14 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :asc,
+          cursor_fields: [charged_at: :asc, id: :asc],
           after: encode_cursor(%{charged_at: p3.charged_at, id: p3.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([p10, p2, p12, p8, p9, p11])
 
-      assert page_info == %PageInfo{
-
+      assert info(page_info) == %PageInfo{
                start_cursor: encode_cursor(%{charged_at: p10.charged_at, id: p10.id}),
                limit: 8
              }
@@ -142,8 +160,7 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :asc,
+          cursor_fields: [charged_at: :asc, id: :asc],
           after: encode_cursor(%{charged_at: p3.charged_at, id: p3.id}),
           before: encode_cursor(%{charged_at: p8.charged_at, id: p8.id}),
           limit: 8
@@ -151,11 +168,13 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p10, p2, p12])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{charged_at: p12.charged_at, id: p12.id}),
+      assert info(page_info) == %PageInfo{
+               end_cursor: nil,
                start_cursor: encode_cursor(%{charged_at: p10.charged_at, id: p10.id}),
                limit: 8
              }
+
+      assert page_info.final_cursor == encode_cursor(%{charged_at: p12.charged_at, id: p12.id})
     end
 
     test "sorts descending without cursors", %{
@@ -163,10 +182,10 @@ defmodule PaginatorTest do
     } do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
-        |> Repo.paginate(cursor_fields: [:charged_at, :id], sort_direction: :desc, limit: 50)
+        |> Repo.paginate(cursor_fields: [charged_at: :desc, id: :desc], limit: 50)
 
       assert to_ids(edges) == to_ids([p11, p9, p8, p12, p2, p10, p3, p7, p6, p1, p4, p5])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
     end
 
     test "sorts descending with before cursor", %{
@@ -175,19 +194,15 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           before: encode_cursor(%{charged_at: p9.charged_at, id: p9.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([p11])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{charged_at: p11.charged_at, id: p11.id}),
-               start_cursor: nil,
-               limit: 8
-             }
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert page_info.final_cursor == encode_cursor(%{charged_at: p11.charged_at, id: p11.id})
     end
 
     test "sorts descending with after cursor", %{
@@ -196,16 +211,15 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           after: encode_cursor(%{charged_at: p9.charged_at, id: p9.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([p8, p12, p2, p10, p3, p7, p6, p1])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{charged_at: p1.charged_at, id: p1.id}),
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{charged_at: p1.charged_at, id: p1.id}),
                start_cursor: encode_cursor(%{charged_at: p8.charged_at, id: p8.id}),
                limit: 8
              }
@@ -217,8 +231,7 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           after: encode_cursor(%{charged_at: p9.charged_at, id: p9.id}),
           before: encode_cursor(%{charged_at: p3.charged_at, id: p3.id}),
           limit: 8
@@ -226,11 +239,13 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p8, p12, p2, p10])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{charged_at: p10.charged_at, id: p10.id}),
+      assert info(page_info) == %PageInfo{
+               end_cursor: nil,
                start_cursor: encode_cursor(%{charged_at: p8.charged_at, id: p8.id}),
                limit: 8
              }
+
+      assert page_info.final_cursor == encode_cursor(%{charged_at: p10.charged_at, id: p10.id})
     end
 
     test "sorts ascending with before cursor at beginning of collection", %{
@@ -239,14 +254,13 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :asc,
+          cursor_fields: [charged_at: :asc, id: :asc],
           before: encode_cursor(%{charged_at: p5.charged_at, id: p5.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts ascending with after cursor at end of collection", %{
@@ -255,14 +269,13 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at()
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :asc,
+          cursor_fields: [charged_at: :asc, id: :asc],
           after: encode_cursor(%{charged_at: p11.charged_at, id: p11.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts descending with before cursor at beginning of collection", %{
@@ -271,14 +284,13 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           before: encode_cursor(%{charged_at: p11.charged_at, id: p11.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts descending with after cursor at end of collection", %{
@@ -287,14 +299,13 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           after: encode_cursor(%{charged_at: p5.charged_at, id: p5.id}),
           limit: 8
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
   end
 
@@ -305,14 +316,14 @@ defmodule PaginatorTest do
     } do
       %Page{edges: edges, page_info: page_info} =
         customer_payments_by_charged_at_and_amount(c1)
-        |> Repo.paginate(cursor_fields: [:charged_at, :amount, :id], limit: 2)
+        |> Repo.paginate(cursor_fields: [charged_at: :asc, amount: :asc, id: :asc], limit: 2)
 
       assert to_ids(edges) == to_ids([p5, p6])
 
       %Page{edges: edges, page_info: _metadata} =
         customer_payments_by_charged_at_and_amount(c1)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :amount, :id],
+          cursor_fields: [charged_at: :asc, amount: :asc, id: :asc],
           limit: 2,
           after: page_info.end_cursor
         )
@@ -327,7 +338,7 @@ defmodule PaginatorTest do
       assert %Page{edges: [], page_info: _metadata} =
                customer_payments_by_charged_at_and_amount(c1)
                |> Repo.paginate(
-                 cursor_fields: [:amount, :charged_at, :id],
+                 cursor_fields: [amount: :asc, charged_at: :asc, id: :asc],
                  before:
                    encode_cursor(%{amount: p6.amount, charged_at: p6.charged_at, id: p6.id}),
                  limit: 1
@@ -339,24 +350,28 @@ defmodule PaginatorTest do
     test "raises error when binding not found", %{
       payments: {_p1, _p2, _p3, _p4, _p5, _p6, _p7, _p8, _p9, _p10, p11, _p12}
     } do
-      assert_raise ArgumentError,
-                   "Could not find binding `bogus_binding` in query aliases: %{customer: 1, payments: 0}",
-                   fn ->
-                     %Page{} =
-                       payments_by_customer_name()
-                       |> Repo.paginate(
-                         cursor_fields: [
-                           {{:bogus_binding, :id}, :asc},
-                           {{:bogus_binding, :name}, :asc}
-                         ],
-                         limit: 50,
-                         before:
-                           encode_cursor(%{
-                             {:bogus_binding, :id} => p11.id,
-                             {:bogus_binding, :name} => p11.customer.name
-                           })
-                       )
-                   end
+      error =
+        assert_raise ArgumentError, fn ->
+          %Page{} =
+            payments_by_customer_name()
+            |> Repo.paginate(
+              cursor_fields: [
+                {{:bogus_binding, :id}, :asc},
+                {{:bogus_binding, :name}, :asc}
+              ],
+              limit: 50,
+              before:
+                encode_cursor(%{
+                  {:bogus_binding, :id} => p11.id,
+                  {:bogus_binding, :name} => p11.customer.name
+                })
+            )
+        end
+
+      # the message prints the query's alias map, whose key order is not stable
+      assert error.message =~ "Could not find binding `bogus_binding` in query aliases: %{"
+      assert error.message =~ "customer: 1"
+      assert error.message =~ "payments: 0"
     end
 
     test "sorts with mixed bindingless, bound columns", %{
@@ -372,28 +387,9 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p3, p4, p5, p6, p7, p8, p9, p10])
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{:id => p10.id, {:customer, :name} => p10.customer.name}),
-               start_cursor: encode_cursor(%{:id => p3.id, {:customer, :name} => p3.customer.name}),
-               limit: 8
-             }
-    end
-
-    test "sorts with mixed columns without direction and bound columns", %{
-      payments: {_p1, _p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, _p12}
-    } do
-      %Page{edges: edges, page_info: page_info} =
-        payments_by_customer_name()
-        |> Repo.paginate(
-          cursor_fields: [:id, {{:customer, :name}, :asc}],
-          before: encode_cursor(%{:id => p11.id, {:customer, :name} => p11.customer.name}),
-          limit: 8
-        )
-
-      assert to_ids(edges) == to_ids([p3, p4, p5, p6, p7, p8, p9, p10])
-
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{:id => p10.id, {:customer, :name} => p10.customer.name}),
+      assert info(page_info) == %PageInfo{
+               end_cursor:
+                 encode_cursor(%{:id => p10.id, {:customer, :name} => p10.customer.name}),
                start_cursor: encode_cursor(%{:id => p3.id, {:customer, :name} => p3.customer.name}),
                limit: 8
              }
@@ -410,7 +406,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
     end
 
     test "sorts ascending with before cursor", %{
@@ -427,7 +423,7 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p3, p4, p5, p6, p7, p8, p9, p10])
 
-      assert page_info == %PageInfo{
+      assert info(page_info) == %PageInfo{
                end_cursor:
                  encode_cursor(%{
                    {:payments, :id} => p10.id,
@@ -456,8 +452,7 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p7, p8, p9, p10, p11, p12])
 
-      assert page_info == %PageInfo{
-
+      assert info(page_info) == %PageInfo{
                start_cursor:
                  encode_cursor(%{
                    {:payments, :id} => p7.id,
@@ -483,12 +478,8 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p7, p8, p9])
 
-      assert page_info == %PageInfo{
-               end_cursor:
-                 encode_cursor(%{
-                   {:payments, :id} => p9.id,
-                   {:customer, :name} => p9.customer.name
-                 }),
+      assert info(page_info) == %PageInfo{
+               end_cursor: nil,
                start_cursor:
                  encode_cursor(%{
                    {:payments, :id} => p7.id,
@@ -496,6 +487,9 @@ defmodule PaginatorTest do
                  }),
                limit: 8
              }
+
+      assert page_info.final_cursor ==
+               encode_cursor(%{{:payments, :id} => p9.id, {:customer, :name} => p9.customer.name})
     end
 
     test "sorts descending without cursors", %{
@@ -509,7 +503,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([p12, p11, p10, p9, p8, p7, p6, p5, p4, p3, p2, p1])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
     end
 
     test "sorts descending with before cursor", %{
@@ -526,15 +520,13 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p12])
 
-      assert page_info == %PageInfo{
-               end_cursor:
-                 encode_cursor(%{
-                   {:payments, :id} => p12.id,
-                   {:customer, :name} => p12.customer.name
-                 }),
+      assert info(page_info) == %PageInfo{end_cursor: nil, limit: 8}
 
-               limit: 8
-             }
+      assert page_info.final_cursor ==
+               encode_cursor(%{
+                 {:payments, :id} => p12.id,
+                 {:customer, :name} => p12.customer.name
+               })
     end
 
     test "sorts descending with after cursor", %{
@@ -544,7 +536,6 @@ defmodule PaginatorTest do
         payments_by_customer_name(:desc, :desc)
         |> Repo.paginate(
           cursor_fields: [{{:payments, :id}, :desc}, {{:customer, :name}, :desc}],
-          sort_direction: :desc,
           after:
             encode_cursor(%{{:payments, :id} => p11.id, {:customer, :name} => p11.customer.name}),
           limit: 8
@@ -552,7 +543,7 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p10, p9, p8, p7, p6, p5, p4, p3])
 
-      assert page_info == %PageInfo{
+      assert info(page_info) == %PageInfo{
                end_cursor:
                  encode_cursor(%{
                    {:payments, :id} => p3.id,
@@ -583,12 +574,8 @@ defmodule PaginatorTest do
 
       assert to_ids(edges) == to_ids([p10, p9, p8, p7])
 
-      assert page_info == %PageInfo{
-               end_cursor:
-                 encode_cursor(%{
-                   {:payments, :id} => p7.id,
-                   {:customer, :name} => p7.customer.name
-                 }),
+      assert info(page_info) == %PageInfo{
+               end_cursor: nil,
                start_cursor:
                  encode_cursor(%{
                    {:payments, :id} => p10.id,
@@ -596,6 +583,9 @@ defmodule PaginatorTest do
                  }),
                limit: 8
              }
+
+      assert page_info.final_cursor ==
+               encode_cursor(%{{:payments, :id} => p7.id, {:customer, :name} => p7.customer.name})
     end
 
     test "sorts ascending with before cursor at beginning of collection", %{
@@ -611,7 +601,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts ascending with after cursor at end of collection", %{
@@ -627,7 +617,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts descending with before cursor at beginning of collection", %{
@@ -643,7 +633,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts descending with after cursor at end of collection", %{
@@ -659,7 +649,7 @@ defmodule PaginatorTest do
         )
 
       assert to_ids(edges) == to_ids([])
-      assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
+      assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 8}
     end
 
     test "sorts on 2nd level join column with a custom cursor value function", %{
@@ -669,7 +659,6 @@ defmodule PaginatorTest do
         payments_by_address_city()
         |> Repo.paginate(
           cursor_fields: [{{:address, :city}, :asc}, id: :asc],
-
           limit: 3,
           fetch_cursor_value_fun: fn
             schema, {:address, :city} ->
@@ -684,10 +673,9 @@ defmodule PaginatorTest do
 
       p7 = Repo.preload(p7, customer: :address)
 
-      assert page_info == %PageInfo{
+      assert info(page_info) == %PageInfo{
                end_cursor:
                  encode_cursor(%{{:address, :city} => p7.customer.address.city, :id => p7.id}),
-
                limit: 3
              }
     end
@@ -698,15 +686,14 @@ defmodule PaginatorTest do
       %Page{edges: edges, page_info: page_info} =
         payments_by_charged_at(:desc)
         |> Repo.paginate(
-          cursor_fields: [:charged_at, :id],
-          sort_direction: :desc,
+          cursor_fields: [charged_at: :desc, id: :desc],
           after: encode_cursor(%{charged_at: nil, id: nil}),
           limit: 8
         )
 
       assert Enum.count(edges) == 8
 
-      assert page_info == %PageInfo{
+      assert info(page_info) == %PageInfo{
                start_cursor: encode_cursor(%{charged_at: p11.charged_at, id: p11.id}),
                limit: 8,
                end_cursor: encode_cursor(%{charged_at: p7.charged_at, id: p7.id})
@@ -719,10 +706,10 @@ defmodule PaginatorTest do
   } do
     %Page{edges: edges, page_info: page_info} =
       payments_by_customer_name()
-      |> Repo.paginate(cursor_fields: [:id], sort_direction: :asc)
+      |> Repo.paginate(cursor_fields: [id: :asc])
 
     assert to_ids(edges) == to_ids([p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12])
-    assert page_info == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
+    assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 50}
   end
 
   test "enforces the minimum limit", %{
@@ -730,10 +717,10 @@ defmodule PaginatorTest do
   } do
     %Page{edges: edges, page_info: page_info} =
       payments_by_customer_name()
-      |> Repo.paginate(cursor_fields: [:id], sort_direction: :asc, limit: 0)
+      |> Repo.paginate(cursor_fields: [id: :asc], limit: 0)
 
     assert to_ids(edges) == to_ids([p1])
-    assert page_info == %PageInfo{end_cursor: encode_cursor(%{id: p1.id}),  limit: 1}
+    assert info(page_info) == %PageInfo{end_cursor: encode_cursor(%{id: p1.id}), limit: 1}
   end
 
   describe "with include_total_count" do
@@ -743,16 +730,14 @@ defmodule PaginatorTest do
       %Page{page_info: page_info} =
         payments_by_customer_name()
         |> Repo.paginate(
-          cursor_fields: [:id],
-          sort_direction: :asc,
+          cursor_fields: [id: :asc],
           limit: 5,
           total_count_limit: :infinity,
           include_total_count: true
         )
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{id: p5.id}),
-
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{id: p5.id}),
                limit: 5,
                total_count: 12,
                total_count_cap_exceeded: false
@@ -765,15 +750,13 @@ defmodule PaginatorTest do
       %Page{page_info: page_info} =
         payments_by_customer_name()
         |> Repo.paginate(
-          cursor_fields: [:id],
-          sort_direction: :asc,
+          cursor_fields: [id: :asc],
           limit: 5,
           include_total_count: true
         )
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{id: p5.id}),
-
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{id: p5.id}),
                limit: 5,
                total_count: 12,
                total_count_cap_exceeded: false
@@ -786,16 +769,14 @@ defmodule PaginatorTest do
       %Page{page_info: page_info} =
         payments_by_customer_name()
         |> Repo.paginate(
-          cursor_fields: [:id],
-          sort_direction: :asc,
+          cursor_fields: [id: :asc],
           limit: 5,
           include_total_count: true,
           total_count_limit: 10
         )
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{id: p5.id}),
-
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{id: p5.id}),
                limit: 5,
                total_count: 10,
                total_count_cap_exceeded: true
@@ -808,16 +789,14 @@ defmodule PaginatorTest do
       %Page{page_info: page_info} =
         from(a in Address, select: a)
         |> Repo.paginate(
-          cursor_fields: [:city],
-          sort_direction: :asc,
+          cursor_fields: [city: :asc],
           limit: 2,
           include_total_count: true,
           total_count_primary_key_field: :city
         )
 
-      assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{city: a2.city}),
-
+      assert info(page_info) == %PageInfo{
+               end_cursor: encode_cursor(%{city: a2.city}),
                limit: 2,
                total_count: 3,
                total_count_cap_exceeded: false
@@ -886,11 +865,10 @@ defmodule PaginatorTest do
 
     assert to_ids(edges) == to_ids([p6, p4, p5])
 
-    assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{amount: p5.amount, charged_at: p5.charged_at, id: p5.id}),
-             start_cursor: nil,
-             limit: 3
-           }
+    assert info(page_info) == %PageInfo{end_cursor: nil, start_cursor: nil, limit: 3}
+
+    assert page_info.final_cursor ==
+             encode_cursor(%{amount: p5.amount, charged_at: p5.charged_at, id: p5.id})
   end
 
   test "sorts on two different directions with after cursor", %{
@@ -906,7 +884,7 @@ defmodule PaginatorTest do
 
     assert to_ids(edges) == to_ids([p5, p7, p8])
 
-    assert page_info == %PageInfo{
+    assert info(page_info) == %PageInfo{
              end_cursor: encode_cursor(%{amount: p8.amount, charged_at: p8.charged_at, id: p8.id}),
              start_cursor: encode_cursor(%{amount: p5.amount, charged_at: p5.charged_at, id: p5.id}),
              limit: 3
@@ -927,12 +905,19 @@ defmodule PaginatorTest do
 
     assert to_ids(edges) == to_ids([p7, p5, p4])
 
-    assert page_info == %PageInfo{
-             end_cursor: encode_cursor(%{amount: p4.amount, charged_at: p4.charged_at, id: p4.id}),
+    assert info(page_info) == %PageInfo{
+             end_cursor: nil,
              start_cursor: encode_cursor(%{amount: p7.amount, charged_at: p7.charged_at, id: p7.id}),
              limit: 8
            }
+
+    assert page_info.final_cursor ==
+             encode_cursor(%{amount: p4.amount, charged_at: p4.charged_at, id: p4.id})
   end
+
+  # `page_count`, `final_cursor` and `cursor_for_record_fun` are asserted in their own test, so the page_info comparisons above stay about the cursors and limits
+  defp info(%PageInfo{} = page_info),
+    do: %{page_info | page_count: nil, final_cursor: nil, cursor_for_record_fun: nil}
 
   defp to_ids(edges), do: Enum.map(edges, & &1.id)
 
@@ -1048,7 +1033,7 @@ defmodule PaginatorTest do
   defp days_ago(days) do
     DateTime.add(
       DateTime.utc_now(),
-      - (days * 86400),
+      -(days * 86400),
       :second
     )
   end
