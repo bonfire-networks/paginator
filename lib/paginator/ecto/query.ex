@@ -45,17 +45,17 @@ defmodule Paginator.Ecto.Query do
   end
 
   # This clause is responsible for transforming legacy list cursors into map cursors
-  defp filter_values(query, fields, values, cursor_direction) when is_list(values) do
+  defp filter_values(query, fields, values, cursor_direction, nullable) when is_list(values) do
     new_values =
       fields
       |> Keyword.keys()
       |> Enum.zip(values)
       |> Map.new()
 
-    filter_values(query, fields, new_values, cursor_direction)
+    filter_values(query, fields, new_values, cursor_direction, nullable)
   end
 
-  defp filter_values(query, fields, values, cursor_direction) when is_map(values) do
+  defp filter_values(query, fields, values, cursor_direction, nullable) when is_map(values) do
     sorts =
       fields
       |> Enum.map(fn {column, _order} -> {column, Map.get(values, column)} end)
@@ -73,20 +73,19 @@ defmodule Paginator.Ecto.Query do
 
         dynamic = true
 
-        dynamic =
+        compare =
           case get_operator_for_field(fields, column_field, cursor_direction) do
-            :lt ->
-              dynamic([{q, position}], (field(q, ^column) < ^value or is_nil(field(q, ^column))) and ^dynamic)
-
-            :gt ->
-              dynamic([{q, position}], (field(q, ^column) > ^value or is_nil(field(q, ^column))) and ^dynamic)
-
-            :lte ->
-              dynamic([{q, position}], (field(q, ^column) <= ^value or is_nil(field(q, ^column))) and ^dynamic)
-
-            :gte ->
-              dynamic([{q, position}], (field(q, ^column) >= ^value or is_nil(field(q, ^column))) and ^dynamic)
+            :lt -> dynamic([{q, position}], field(q, ^column) < ^value)
+            :gt -> dynamic([{q, position}], field(q, ^column) > ^value)
+            :lte -> dynamic([{q, position}], field(q, ^column) <= ^value)
+            :gte -> dynamic([{q, position}], field(q, ^column) >= ^value)
           end
+
+        # Postgres can't use `col > v OR col IS NULL` as an index condition, so a scan reads every row below the cursor: only fields the caller lists as nullable get the escape, which keeps their null rows in later pages
+        dynamic =
+          if column_field in nullable,
+            do: dynamic([{q, position}], (^compare or is_nil(field(q, ^column))) and ^dynamic),
+            else: dynamic([{q, position}], ^compare and ^dynamic)
 
         dynamic =
           sorts
@@ -118,22 +117,24 @@ defmodule Paginator.Ecto.Query do
          after_values: after_values,
          before: nil,
          cursor_fields: cursor_fields,
+         cursor_fields_nullable: nullable,
          cursor_inclusive: inclusive
        }) do
     dir = if inclusive, do: :after_inclusive, else: :after
     query
-    |> filter_values(cursor_fields, after_values, dir)
+    |> filter_values(cursor_fields, after_values, dir, List.wrap(nullable))
   end
 
   defp maybe_where(query, %Config{
          after: nil,
          before_values: before_values,
          cursor_fields: cursor_fields,
+         cursor_fields_nullable: nullable,
          cursor_inclusive: inclusive
        }) do
     dir = if inclusive, do: :before_inclusive, else: :before
     query
-    |> filter_values(cursor_fields, before_values, dir)
+    |> filter_values(cursor_fields, before_values, dir, List.wrap(nullable))
     |> Ecto.Query.reverse_order()
   end
 
@@ -141,13 +142,15 @@ defmodule Paginator.Ecto.Query do
          after_values: after_values,
          before_values: before_values,
          cursor_fields: cursor_fields,
+         cursor_fields_nullable: nullable,
          cursor_inclusive: inclusive
        }) do
     after_dir = if inclusive, do: :after_inclusive, else: :after
     before_dir = if inclusive, do: :before_inclusive, else: :before
+    nullable = List.wrap(nullable)
     query
-    |> filter_values(cursor_fields, after_values, after_dir)
-    |> filter_values(cursor_fields, before_values, before_dir)
+    |> filter_values(cursor_fields, after_values, after_dir, nullable)
+    |> filter_values(cursor_fields, before_values, before_dir, nullable)
   end
 
   # Lookup position of binding in query aliases

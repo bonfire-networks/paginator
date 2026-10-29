@@ -12,6 +12,7 @@ defmodule Paginator.Config do
     :before,
     :before_values,
     :cursor_fields,
+    :cursor_fields_nullable,
     :fetch_cursor_value_fun,
     :include_total_count,
     :total_count_primary_key_field,
@@ -36,6 +37,7 @@ defmodule Paginator.Config do
       before: opts[:before],
       before_values: Cursor.maybe_decode(opts[:before]),
       cursor_fields: opts[:cursor_fields],
+      cursor_fields_nullable: List.wrap(opts[:cursor_fields_nullable]),
       fetch_cursor_value_fun:
         opts[:fetch_cursor_value_fun] || (&Paginator.default_fetch_cursor_value/2),
       include_total_count: opts[:include_total_count] || false,

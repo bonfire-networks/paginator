@@ -915,11 +915,101 @@ defmodule PaginatorTest do
              encode_cursor(%{amount: p4.amount, charged_at: p4.charged_at, id: p4.id})
   end
 
+  # Postgres can't use `col > v OR col IS NULL` as an index condition, so bounds are plain comparisons unless the caller lists the field in `cursor_fields_nullable`. A nullable field that isn't listed would silently lose its null rows from later pages.
+  describe "cursor_fields_nullable" do
+    setup %{payments: {_p1, _p2, _p3, _p4, _p5, _p6, _p7, _p8, _p9, _p10, p11, _p12}} do
+      [after: encode_cursor(%{charged_at: p11.charged_at, id: p11.id})]
+    end
+
+    test "bounds are plain comparisons by default", %{after: after_cursor} do
+      sql =
+        payments_by_charged_at()
+        |> Paginator.paginated_query(
+          cursor_fields: [charged_at: :asc, id: :asc],
+          after: after_cursor
+        )
+        |> to_sql()
+
+      refute sql =~ "IS NULL"
+    end
+
+    test "only the listed fields keep the IS NULL escape", %{after: after_cursor} do
+      sql =
+        payments_by_charged_at()
+        |> Paginator.paginated_query(
+          cursor_fields: [charged_at: :asc, id: :asc],
+          cursor_fields_nullable: [:charged_at],
+          after: after_cursor
+        )
+        |> to_sql()
+
+      assert sql =~ ~s("charged_at" IS NULL)
+      refute sql =~ ~s("id" IS NULL)
+    end
+
+    test "rows with a null in a listed field still show up on later pages" do
+      [null1, null2] = insert_list(2, :payment, charged_at: nil)
+
+      ids =
+        page_through(&payments_by_charged_at/0,
+          cursor_fields: [charged_at: :asc, id: :asc],
+          cursor_fields_nullable: [:charged_at],
+          limit: 4
+        )
+
+      # Postgres sorts nulls last in ascending order
+      assert Enum.take(ids, -2) == [null1.id, null2.id]
+      assert length(ids) == 14
+    end
+
+    test "a null cursor value in an unlisted field logs a warning" do
+      insert_list(2, :payment, charged_at: nil)
+
+      # 12 dated payments + the first null one fill the page, so the cursor is built from a null row
+      opts = [cursor_fields: [charged_at: :asc, id: :asc], limit: 13]
+
+      # warnings only: the debug logs print the whole config, which has a `cursor_fields_nullable` key
+      log =
+        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+          payments_by_charged_at() |> Repo.paginate(opts)
+        end)
+
+      assert log =~ "not listed in `cursor_fields_nullable`"
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+          payments_by_charged_at() |> Repo.paginate(opts ++ [cursor_fields_nullable: [:charged_at]])
+        end)
+
+      refute log =~ "cursor_fields_nullable"
+    end
+  end
+
   # `page_count`, `final_cursor` and `cursor_for_record_fun` are asserted in their own test, so the page_info comparisons above stay about the cursors and limits
   defp info(%PageInfo{} = page_info),
     do: %{page_info | page_count: nil, final_cursor: nil, cursor_for_record_fun: nil}
 
   defp to_ids(edges), do: Enum.map(edges, & &1.id)
+
+  defp to_sql(query) do
+    {sql, _params} = Ecto.Adapters.SQL.to_sql(:all, Repo, query)
+    sql
+  end
+
+  # ids of every row, following `end_cursor` page by page
+  defp page_through(query_fun, opts, after_cursor \\ nil, acc \\ [], depth \\ 0)
+
+  defp page_through(_query_fun, _opts, _after_cursor, acc, depth) when depth > 20, do: acc
+
+  defp page_through(query_fun, opts, after_cursor, acc, depth) do
+    page_opts = if after_cursor, do: opts ++ [after: after_cursor], else: opts
+    %Page{edges: edges, page_info: page_info} = query_fun.() |> Repo.paginate(page_opts)
+    acc = acc ++ to_ids(edges)
+
+    if page_info.end_cursor,
+      do: page_through(query_fun, opts, page_info.end_cursor, acc, depth + 1),
+      else: acc
+  end
 
   defp create_customers_and_payments(_context) do
     c1 = insert(:customer, %{name: "Bob"})

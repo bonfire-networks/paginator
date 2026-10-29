@@ -72,6 +72,11 @@ defmodule Paginator do
     * `:cursor_fields` - The fields with sorting direction used to determine the
     cursor. In most cases, this should be the same fields as the ones used for sorting in the query.
     When you use named bindings in your query they can also be provided.
+    * `:cursor_fields_nullable` - The cursor fields (as written in `:cursor_fields`, without the
+    direction) whose column can be null. Only these get an `OR field IS NULL` in the cursor bound, which keeps
+    their null rows in later pages. Other fields use a plain comparison, which Postgres can use as an
+    index condition, but it never matches a null: a cursor with a nil value for such a field logs a warning.
+    Defaults to `[]`.
     * `:fetch_cursor_value_fun` function of arity 2 to lookup cursor values on returned records.
     Defaults to `Paginator.default_fetch_cursor_value/2`
     * `:include_total_count` - Set this to true to return the total number of
@@ -198,7 +203,8 @@ defmodule Paginator do
         cursor_for_record_fun: fn record -> cursor_for_record(
           record,
           config.cursor_fields,
-          config.fetch_cursor_value_fun
+          config.fetch_cursor_value_fun,
+          config.cursor_fields_nullable
         )
       end
       }
@@ -242,10 +248,12 @@ defmodule Paginator do
   def cursor_for_record(
         record,
         cursor_fields,
-        fetch_cursor_value_fun \\ &Paginator.default_fetch_cursor_value/2
+        fetch_cursor_value_fun \\ &Paginator.default_fetch_cursor_value/2,
+        cursor_fields_nullable \\ []
       ) do
     fetch_cursor_value(record, %Config{
       cursor_fields: cursor_fields,
+      cursor_fields_nullable: cursor_fields_nullable,
       fetch_cursor_value_fun: fetch_cursor_value_fun
     })
   end
@@ -326,17 +334,34 @@ defmodule Paginator do
 
   defp fetch_cursor_value(schema, %Config{
          cursor_fields: cursor_fields,
+         cursor_fields_nullable: nullable,
          fetch_cursor_value_fun: fetch_cursor_value_fun
        }) do
+    nullable = List.wrap(nullable)
+
     cursor_fields
     |> Enum.map(fn
       {cursor_field, _order} ->
-        {cursor_field, fetch_cursor_value_fun.(schema, cursor_field)}
+        fetch_checked_cursor_value(schema, cursor_field, fetch_cursor_value_fun, nullable)
 
       cursor_field when is_atom(cursor_field) ->
-        {cursor_field, fetch_cursor_value_fun.(schema, cursor_field)}
+        fetch_checked_cursor_value(schema, cursor_field, fetch_cursor_value_fun, nullable)
     end)
     |> Cursor.maybe_encode()
+  end
+
+  # bounds on fields not listed in `cursor_fields_nullable` are plain comparisons, which never match a null: warn rather than silently skip the null rows on later pages
+  defp fetch_checked_cursor_value(schema, cursor_field, fetch_cursor_value_fun, nullable) do
+    value = fetch_cursor_value_fun.(schema, cursor_field)
+
+    if is_nil(value) and cursor_field not in nullable do
+      warn(
+        cursor_field,
+        "the cursor has a nil value for this field, which is not listed in `cursor_fields_nullable`, so pages after it skip the rows where it is null"
+      )
+    end
+
+    {cursor_field, value}
   end
 
   defp first_page?(page_count, %Config{limit: limit}) do
