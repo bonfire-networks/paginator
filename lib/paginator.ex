@@ -318,7 +318,7 @@ defmodule Paginator do
     last_or_nil(paginated_entries, config)
   end
 
-  defp after_cursor(paginated_entries, page_count, config) do
+  defp after_cursor(paginated_entries, _page_count, config) do
     # if last_page?(page_count, config) do
     #   nil
     # else

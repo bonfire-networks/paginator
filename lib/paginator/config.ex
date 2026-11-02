@@ -124,7 +124,8 @@ defmodule Paginator.Config do
   end
 
   def limit(opts) do
-    max(ensure_int(opts[:limit]) || @default_limit, @minimum_limit)
+    # `ensure_int/1` already falls back to the default limit, so no `|| @default_limit` here
+    max(ensure_int(opts[:limit]), @minimum_limit)
     |> min(opts[:maximum_limit] || @maximum_limit)
   end
 

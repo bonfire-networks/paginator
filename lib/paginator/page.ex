@@ -31,4 +31,7 @@ defimpl Enumerable, for: Paginator.Page do
   #   Enumerable.member?(edges)
   # end
 
+  # slicing is optional: `{:error, module}` makes `Enum` fall back to `reduce/3`
+  def slice(_page), do: {:error, __MODULE__}
+
 end
